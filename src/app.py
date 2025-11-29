@@ -8,7 +8,9 @@ for extracurricular activities at Mergington High School.
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 import os
+import json
 from pathlib import Path
 
 app = FastAPI(title="Mergington High School API",
@@ -77,6 +79,22 @@ activities = {
     }
 }
 
+# Security setup
+security = HTTPBasic()
+
+# Load teacher credentials from a JSON file
+credentials_file = os.path.join(current_dir, "teacher_credentials.json")
+with open(credentials_file, "r") as f:
+    teacher_credentials = json.load(f)
+
+# Helper function to verify teacher credentials
+def verify_teacher(credentials: HTTPBasicCredentials):
+    username = credentials.username
+    password = credentials.password
+    if username in teacher_credentials and teacher_credentials[username] == password:
+        return True
+    raise HTTPException(status_code=401, detail="Invalid credentials")
+
 
 @app.get("/")
 def root():
@@ -89,8 +107,11 @@ def get_activities():
 
 
 @app.post("/activities/{activity_name}/signup")
-def signup_for_activity(activity_name: str, email: str):
-    """Sign up a student for an activity"""
+def signup_for_activity(activity_name: str, email: str, credentials: HTTPBasicCredentials = security):
+    """Sign up a student for an activity (restricted to teachers)"""
+    # Verify teacher credentials
+    verify_teacher(credentials)
+
     # Validate activity exists
     if activity_name not in activities:
         raise HTTPException(status_code=404, detail="Activity not found")
@@ -111,8 +132,11 @@ def signup_for_activity(activity_name: str, email: str):
 
 
 @app.delete("/activities/{activity_name}/unregister")
-def unregister_from_activity(activity_name: str, email: str):
-    """Unregister a student from an activity"""
+def unregister_from_activity(activity_name: str, email: str, credentials: HTTPBasicCredentials = security):
+    """Unregister a student from an activity (restricted to teachers)"""
+    # Verify teacher credentials
+    verify_teacher(credentials)
+
     # Validate activity exists
     if activity_name not in activities:
         raise HTTPException(status_code=404, detail="Activity not found")
